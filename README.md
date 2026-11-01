@@ -1,0 +1,1 @@
+# indo-armenia-community-registry
