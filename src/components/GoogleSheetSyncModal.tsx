@@ -13,7 +13,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { Member } from '../types/member';
-import { getLocalSheetsConfig, saveLocalSheetsConfig } from '../services/storage';
+import { apiFetch, exportMembersToCsv, getLocalSheetsConfig, saveLocalSheetsConfig } from '../services/storage';
 
 interface GoogleSheetSyncModalProps {
   isOpen: boolean;
@@ -35,13 +35,12 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatusMessage, setSyncStatusMessage] = useState<string | null>(null);
-  const [copiedFormula, setCopiedFormula] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
-  const [activeTab, setActiveTab] = useState<'formula' | 'webhook'>('formula');
+  const [activeTab, setActiveTab] = useState<'csv' | 'webhook'>('csv');
 
   useEffect(() => {
     // Fetch server configuration if available
-    fetch('/api/google-sheets/config')
+    apiFetch('/api/google-sheets/config')
       .then((res) => res.json())
       .then((data) => {
         if (data && data.data) {
@@ -53,24 +52,15 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
 
   if (!isOpen) return null;
 
-  const currentHost = typeof window !== 'undefined' ? window.location.origin : '';
-  const importFormula = `=IMPORTDATA("${currentHost}/api/members/csv")`;
-
-  const handleCopyFormula = () => {
-    navigator.clipboard.writeText(importFormula);
-    setCopiedFormula(true);
-    setTimeout(() => setCopiedFormula(false), 2500);
-  };
-
   const appsScriptCode = `function doPost(e) {
   var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
   var data = JSON.parse(e.postData.contents);
-  if (data.members && data.members.length > 0) {
+    if (data.members) {
     sheet.clear();
-    var headers = ["Member ID", "Full Name", "City (Home)", "Home Country", "Phone", "Email", "Working Skill", "Currently Working Status", "Blood Group", "Status", "Registered At"];
+    var headers = ["Member ID", "Full Name", "Home Country", "WhatsApp Country Code", "WhatsApp Number", "Arrival Date in Armenia", "Agency / Agent Name", "Status", "Registered At"];
     sheet.appendRow(headers);
     data.members.forEach(function(m) {
-      sheet.appendRow([m.id, m.fullName, m.city, m.country, m.phone, m.email, m.workingSkill, m.currentlyWorkingStatus, m.bloodGroup, m.verificationStatus, m.registeredAt]);
+      sheet.appendRow([m.id, m.fullName, m.country, m.whatsappCountryCode, m.whatsappNumber, m.arrivalDateInArmenia, m.agentOrAgencyName, m.verificationStatus, m.registeredAt]);
     });
   }
   return ContentService.createTextOutput(JSON.stringify({result: "success"})).setMimeType(ContentService.MimeType.JSON);
@@ -95,9 +85,17 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
     saveLocalSheetsConfig(updated);
 
     try {
-      const res = await fetch('/api/google-sheets/sync', {
+      const saved = await apiFetch('/api/google-sheets/config', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          webhookUrl: config.webhookUrl,
+          sheetUrl: config.sheetUrl,
+          autoSync: config.autoSync,
+        }),
+      });
+      if (!saved.ok) throw new Error('Could not save Google Sheets settings.');
+      const res = await apiFetch('/api/google-sheets/sync', {
+        method: 'POST',
         body: JSON.stringify({
           webhookUrl: config.webhookUrl,
           sheetUrl: config.sheetUrl,
@@ -108,10 +106,11 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
       if (res.ok) {
         setSyncStatusMessage(`Successfully linked & synced ${members.length} members with Google Sheet!`);
       } else {
-        setSyncStatusMessage(`Synced ${members.length} records to local cache & CSV feed.`);
+        const result = await res.json().catch(() => ({}));
+        throw new Error(result.error || 'Google Sheets sync failed.');
       }
     } catch (e) {
-      setSyncStatusMessage(`Synced ${members.length} records locally.`);
+      setSyncStatusMessage(e instanceof Error ? e.message : 'Google Sheets sync failed.');
     } finally {
       setIsSyncing(false);
     }
@@ -131,7 +130,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
                 Link Data with Google Sheets
               </h3>
               <p className="text-[11px] text-emerald-100 font-semibold mt-0.5">
-                Real-Time Cloud Synchronization for Indo-Armenia LLC
+                CSV export or server-side Google Sheets sync
               </p>
             </div>
           </div>
@@ -148,15 +147,15 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
           {/* Method Tabs */}
           <div className="grid grid-cols-2 p-1 bg-slate-950 rounded-2xl border border-slate-800">
             <button
-              onClick={() => setActiveTab('formula')}
+              onClick={() => setActiveTab('csv')}
               className={`py-2 px-3 text-xs font-black rounded-xl transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                activeTab === 'formula'
+                activeTab === 'csv'
                   ? 'bg-emerald-500 text-slate-950 shadow-md'
                   : 'text-slate-400 hover:text-white'
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Method 1: Live Formula (Instant)</span>
+              <span>Download CSV</span>
             </button>
             <button
               onClick={() => setActiveTab('webhook')}
@@ -171,58 +170,27 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
             </button>
           </div>
 
-          {activeTab === 'formula' ? (
+          {activeTab === 'csv' ? (
             <div className="space-y-3.5">
               <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-200 space-y-1.5">
                 <div className="font-black text-white flex items-center gap-1.5 text-sm">
                   <Database className="w-4 h-4 text-emerald-400" />
-                  <span>Continuous Real-Time Sync via `=IMPORTDATA()`</span>
+                  <span>Admin-protected member export</span>
                 </div>
                 <p className="text-slate-300">
-                  Google Sheets updates automatically whenever new members register. Simply copy the formula below and paste it into cell <strong className="text-white">A1</strong> of your Google Sheet.
+                  Export the current member list as a CSV and import it into Google Sheets. The endpoint requires an administrator session, so public spreadsheet formulas cannot access it.
                 </p>
               </div>
-
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Google Sheets Formula:
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    readOnly
-                    value={importFormula}
-                    className="flex-1 px-3 py-2.5 rounded-xl border border-slate-700 bg-slate-950 text-emerald-300 text-xs font-mono font-bold select-all focus:outline-none"
-                  />
-                  <button
-                    onClick={handleCopyFormula}
-                    className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
-                  >
-                    {copiedFormula ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    <span>{copiedFormula ? 'COPIED!' : 'COPY'}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Quick links to open Google Sheets */}
-              <div className="flex items-center justify-between pt-1">
-                <a
-                  href="https://sheets.new"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-bold hover:underline"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Open New Blank Google Sheet (sheets.new)</span>
-                </a>
-                <a
-                  href="/api/members/csv"
-                  download="indo_armenia_members.csv"
-                  className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white font-medium hover:underline"
-                >
-                  <span>Download Raw CSV</span>
-                </a>
-              </div>
+              <button
+                type="button"
+                onClick={() => exportMembersToCsv(members)}
+                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs uppercase flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              >
+                <FileSpreadsheet className="w-4 h-4" /> Download member CSV
+              </button>
+              <a href="https://sheets.new" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 font-bold hover:underline">
+                <ExternalLink className="w-3.5 h-3.5" /> Open Google Sheets
+              </a>
             </div>
           ) : (
             <div className="space-y-3.5">
@@ -261,7 +229,7 @@ export const GoogleSheetSyncModal: React.FC<GoogleSheetSyncModalProps> = ({
                   className="w-4 h-4 rounded border-slate-700 text-emerald-500 focus:ring-emerald-400 cursor-pointer"
                 />
                 <label htmlFor="autoSync" className="text-xs text-slate-300 font-semibold cursor-pointer">
-                  Automatically sync new member registrations directly to this Google Sheet
+                  Sync the sheet after each new member registers
                 </label>
               </div>
 

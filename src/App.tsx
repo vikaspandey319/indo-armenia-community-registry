@@ -6,10 +6,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { AppLanguage, Member, TextScale } from './types/member';
 import {
-  getStoredMembers,
   subscribeToMemberUpdates,
   syncMembersWithServer,
 } from './services/storage';
+import { auth } from './services/firebase';
+import { signOut } from 'firebase/auth';
 import { Header, AppTab } from './components/Header';
 import { RegistrationForm } from './components/RegistrationForm';
 import { MembersDirectory } from './components/MembersDirectory';
@@ -40,20 +41,18 @@ export default function App() {
     name: string;
   } | null>(null);
 
-  // Initialize members list with instant local cache + real-time server sync
+  // Load only records returned by the server after it verifies the member session.
   useEffect(() => {
-    // 1. Initial fast local render
-    const initialList = getStoredMembers();
-    setMembers(initialList);
+    // Never render cached personal records before the server verifies member access.
+    localStorage.removeItem('indo_armenia_members_v1');
+    setMembers([]);
 
-    // 2. Fetch latest synced records from server immediately
+    // Fetch records through the authorized server API.
     syncMembersWithServer().then((fresh) => {
-      if (fresh && fresh.length > 0) {
-        setMembers(fresh);
-      }
+      setMembers(fresh);
     });
 
-    // 3. Real-time event subscriber (SSE + BroadcastChannel + periodic sync)
+    // Keep updates synchronized between tabs on this device.
     const unsubscribe = subscribeToMemberUpdates((event) => {
       setMembers(event.all);
       if (event.type === 'created' && event.member) {
@@ -86,7 +85,7 @@ export default function App() {
     setMembers(fresh);
   }, []);
 
-  // Handle Tab Change with Admin Passcode Protection (197519)
+  // Handle tab changes through Firebase administrator authentication.
   const handleTabChange = (tab: AppTab) => {
     if (tab === 'admin') {
       if (!isAdminUnlocked) {
@@ -105,6 +104,7 @@ export default function App() {
 
   const handleLockAdmin = () => {
     setIsAdminUnlocked(false);
+    signOut(auth).catch(() => {});
     setCurrentTab('members');
   };
 
@@ -149,7 +149,7 @@ export default function App() {
           </div>
           <div className="flex-1">
             <div className="text-xs font-bold text-amber-400">
-              New Member Synced Real-Time!
+              New Member Registration Received
             </div>
             <div className="text-sm font-extrabold">{newSubmissionToast.name}</div>
             <div className="text-xs text-slate-400 font-mono mt-0.5">
@@ -231,7 +231,7 @@ export default function App() {
           <div className="flex items-center gap-2 text-slate-400">
             <span className="flex items-center gap-1 text-emerald-400">
               <ShieldCheck className="w-3 h-3" />
-              <span>AES-256 Encrypted</span>
+              <span>Encrypted Backups</span>
             </span>
             <span>·</span>
             <button
@@ -253,7 +253,7 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Admin Passcode Gate Modal (Protected with 197519) */}
+      {/* Administrator sign-in gate */}
       <AdminPasscodeModal
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
@@ -290,7 +290,7 @@ export default function App() {
             <div className="min-w-0">
               <div className="text-[10px] font-black uppercase tracking-wider text-amber-300 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
-                <span>New Member Synced Live</span>
+                <span>New Registration Received</span>
               </div>
               <div className="text-xs font-black text-white truncate">
                 {newSubmissionToast.name}

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, ShieldAlert, KeyRound, X, CheckCircle2 } from 'lucide-react';
-import { CrestLogo } from './CrestLogo';
+import { auth } from '../services/firebase';
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 interface AdminPasscodeModalProps {
   isOpen: boolean;
@@ -8,32 +9,44 @@ interface AdminPasscodeModalProps {
   onSuccess: () => void;
 }
 
-const ADMIN_SECRET = '197519';
-
 export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
 }) => {
-  const [passcode, setPasscode] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (passcode.trim() === ADMIN_SECRET) {
+    setIsSubmitting(true);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const idToken = await credential.user.getIdToken();
+      const response = await fetch('/api/admin/session', {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!response.ok) {
+        await signOut(auth);
+        throw new Error('This account is not authorized for the administrator portal.');
+      }
       setErrorMessage('');
       setIsSuccess(true);
       setTimeout(() => {
         onSuccess();
-        setPasscode('');
+        setPassword('');
         setIsSuccess(false);
       }, 500);
-    } else {
-      setErrorMessage('Access Denied: Incorrect administrator password. Please try again.');
-      setPasscode('');
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Sign in failed. Check your credentials.');
+      setPassword('');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -55,7 +68,7 @@ export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
             Administrator Access
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Enter the protected admin passcode to manage database and cloud backups.
+            Sign in with the authorized administrator account.
           </p>
         </div>
 
@@ -77,17 +90,27 @@ export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
           <div className="relative">
             <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
             <input
-              type="password"
-              inputMode="numeric"
-              maxLength={12}
+              type="email"
               autoFocus
-              value={passcode}
+              value={email}
               onChange={(e) => {
-                setPasscode(e.target.value);
+                setEmail(e.target.value);
                 setErrorMessage('');
               }}
-              placeholder="Enter Admin Password..."
+              placeholder="Administrator email"
+              autoComplete="username"
               className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-slate-300 focus:border-amber-500 text-slate-900 text-center font-mono text-base font-bold tracking-widest focus:outline-none transition-all shadow-inner"
+            />
+          </div>
+
+          <div className="relative">
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => { setPassword(e.target.value); setErrorMessage(''); }}
+              placeholder="Password"
+              autoComplete="current-password"
+              className="w-full px-4 py-3 rounded-xl border-2 border-slate-300 focus:border-amber-500 text-slate-900 text-center font-mono text-base font-bold focus:outline-none transition-all shadow-inner"
             />
           </div>
 
@@ -101,15 +124,16 @@ export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
             </button>
             <button
               type="submit"
+              disabled={isSubmitting}
               className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-extrabold shadow-md transition-all cursor-pointer"
             >
-              Unlock
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
             </button>
           </div>
         </form>
 
         <div className="pt-2 text-[10px] text-slate-400 font-mono">
-          Indo Armenia LLC · Security Gate
+          Firebase Authentication · Admin email allowlist
         </div>
       </div>
     </div>

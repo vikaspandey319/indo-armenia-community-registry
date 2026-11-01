@@ -73,7 +73,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [sosAlerts, setSosAlerts] = useState<SosAlert[]>([]);
   const [activeSosModalAlert, setActiveSosModalAlert] = useState<SosAlert | null>(null);
 
-  // Load and listen to SOS alerts in real-time
+  // Load SOS alerts and refresh them periodically because serverless functions do not keep SSE connections open.
   useEffect(() => {
     const fetchAlerts = async () => {
       const list = await getSosAlerts();
@@ -85,7 +85,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     };
 
     fetchAlerts();
-    const interval = setInterval(fetchAlerts, 4000);
+    const interval = setInterval(fetchAlerts, 15000);
 
     const unsubscribe = subscribeToSosAlerts((event) => {
       if (event.type === 'sos_alert' && event.alert) {
@@ -106,7 +106,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   }, []);
 
   const handleResolveSos = async (id: string) => {
-    await resolveSosAlert(id);
+    try {
+      await resolveSosAlert(id);
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not resolve SOS alert.');
+      return;
+    }
     setSosAlerts((prev) =>
       prev.map((a) => (a.id === id ? { ...a, status: 'resolved' } : a))
     );
@@ -184,26 +189,36 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     setIsViewingCard(false);
   };
 
-  const handleStatusChange = (status: VerificationStatus) => {
+  const handleStatusChange = async (status: VerificationStatus) => {
     if (!activeMember) return;
-    const updatedList = updateMemberStatus(activeMember.id, status, adminNotes);
-    onMembersUpdated(updatedList);
-    setActiveMember((prev) => (prev ? { ...prev, verificationStatus: status, notes: adminNotes } : null));
-  };
-
-  const handleSaveNotes = () => {
-    if (!activeMember) return;
-    const updatedList = updateMemberStatus(activeMember.id, activeMember.verificationStatus, adminNotes);
-    onMembersUpdated(updatedList);
-    setActiveMember((prev) => (prev ? { ...prev, notes: adminNotes } : null));
-  };
-
-  const handleDeleteMember = (id: string) => {
-    if (window.confirm('Are you sure you want to remove this member registration?')) {
-      const updatedList = deleteMember(id);
+    try {
+      const updatedList = await updateMemberStatus(activeMember.id, status, adminNotes);
       onMembersUpdated(updatedList);
-      if (activeMember?.id === id) {
-        setActiveMember(null);
+      setActiveMember((prev) => (prev ? { ...prev, verificationStatus: status, notes: adminNotes } : null));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not update this member.');
+    }
+  };
+
+  const handleSaveNotes = async () => {
+    if (!activeMember) return;
+    try {
+      const updatedList = await updateMemberStatus(activeMember.id, activeMember.verificationStatus, adminNotes);
+      onMembersUpdated(updatedList);
+      setActiveMember((prev) => (prev ? { ...prev, notes: adminNotes } : null));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Could not save notes.');
+    }
+  };
+
+  const handleDeleteMember = async (id: string) => {
+    if (window.confirm('Are you sure you want to remove this member registration?')) {
+      try {
+        const updatedList = await deleteMember(id);
+        onMembersUpdated(updatedList);
+        if (activeMember?.id === id) setActiveMember(null);
+      } catch (error) {
+        window.alert(error instanceof Error ? error.message : 'Could not delete this member.');
       }
     }
   };
@@ -237,14 +252,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <span>·</span>
               <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 text-[11px] font-black tracking-normal">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-                <span>REAL-TIME SYNC LIVE</span>
+                <span>SERVER-SYNCED · 15 SEC REFRESH</span>
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight mt-0.5">
               Member Registry & Database Management
             </h1>
             <p className="text-xs sm:text-sm text-amber-100/90 mt-1">
-              Real-time monitoring and secure encrypted cloud vault for registered Indian community members.
+              Member and SOS records are loaded from the authenticated community database.
             </p>
           </div>
         </div>

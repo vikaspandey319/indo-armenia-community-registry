@@ -22,7 +22,6 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
   isAdmin = false,
   onRefresh,
 }) => {
-  // Check if current user is registered on this device/browser
   const [registeredMemberId, setRegisteredMemberId] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('indo_armenia_registered_member_id');
@@ -40,44 +39,50 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
     }
   }, [members, registeredMemberId]);
 
-  // State for verification form if member registered earlier or on another device
-  const [verifyInput, setVerifyInput] = useState('');
+  const [hasMemberSession, setHasMemberSession] = useState(false);
+  const [verifyId, setVerifyId] = useState('');
+  const [verifyPhone, setVerifyPhone] = useState('');
+  const [verifyCountryCode, setVerifyCountryCode] = useState('+91');
   const [verifyError, setVerifyError] = useState('');
   const [verifySuccess, setVerifySuccess] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Is user authorized to view the directory (either just registered, saved in localStorage, or Admin)
-  const isAuthorized = isAdmin || Boolean(registeredMemberId);
+  useEffect(() => {
+    if (isAdmin) {
+      setHasMemberSession(true);
+      return;
+    }
+    fetch('/api/members', { credentials: 'same-origin' })
+      .then((response) => setHasMemberSession(response.ok))
+      .catch(() => setHasMemberSession(false));
+  }, [isAdmin, members]);
 
-  // Quick verification handler for already-registered members
-  const handleVerifyRegisteredMember = (e: React.FormEvent) => {
+  const isAuthorized = isAdmin || hasMemberSession;
+
+  const handleVerifyRegisteredMember = async (e: React.FormEvent) => {
     e.preventDefault();
     setVerifyError('');
     setVerifySuccess('');
-
-    const cleanInput = verifyInput.trim().toLowerCase();
-    const cleanDigits = verifyInput.replace(/\D/g, '');
-
-    if (!cleanInput) {
-      setVerifyError('Please enter your Member ID or WhatsApp number.');
+    if (!verifyId.trim() || !verifyPhone.trim()) {
+      setVerifyError('Enter both your Member ID and WhatsApp number.');
       return;
     }
-
-    // Match by ID or by WhatsApp number
-    const matched = members.find((m) => {
-      const matchId = m.id.toLowerCase() === cleanInput;
-      const matchPhone = cleanDigits.length >= 6 && m.whatsappNumber.replace(/\D/g, '').includes(cleanDigits);
-      return matchId || matchPhone;
-    });
-
-    if (matched) {
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('indo_armenia_registered_member_id', matched.id);
-      }
-      setRegisteredMemberId(matched.id);
-      setVerifySuccess(`Welcome back, ${matched.fullName}! Verification successful.`);
-    } else {
-      setVerifyError('No registered member found matching this ID or phone number. Please register first.');
+    try {
+      const response = await fetch('/api/members/verify', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: verifyId.trim(), whatsappCountryCode: verifyCountryCode, whatsappNumber: verifyPhone }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Could not verify this member.');
+      localStorage.setItem('indo_armenia_registered_member_id', result.data.id);
+      setRegisteredMemberId(result.data.id);
+      setHasMemberSession(true);
+      setVerifySuccess(`Welcome back, ${result.data.fullName}! Verification successful.`);
+      onRefresh?.();
+    } catch (error) {
+      setVerifyError(error instanceof Error ? error.message : 'Could not verify this member.');
     }
   };
 
@@ -160,17 +165,31 @@ export const MembersDirectory: React.FC<MembersDirectoryProps> = ({
           {/* Secondary Quick Unlock: Already Registered? */}
           <div className="pt-4 border-t border-slate-800 text-left">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2 text-center">
-              Already registered? Enter your Member ID or Phone to unlock:
+              Already registered? Verify with your Member ID and WhatsApp number:
             </span>
             <form onSubmit={handleVerifyRegisteredMember} className="space-y-2">
-              <div className="flex gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <input
                   type="text"
-                  value={verifyInput}
-                  onChange={(e) => setVerifyInput(e.target.value)}
-                  placeholder="Member ID (e.g. IA-IND-2026-...) or Phone"
+                  value={verifyId}
+                  onChange={(e) => setVerifyId(e.target.value)}
+                  placeholder="Member ID"
                   className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                 />
+                <div className="flex gap-2">
+                  <select value={verifyCountryCode} onChange={(e) => setVerifyCountryCode(e.target.value)} className="bg-slate-950 border border-slate-700 rounded-xl px-2 py-2 text-xs text-white">
+                    <option value="+91">+91</option><option value="+374">+374</option><option value="+971">+971</option><option value="+1">+1</option><option value="+44">+44</option><option value="+7">+7</option><option value="+995">+995</option>
+                  </select>
+                  <input
+                    type="tel"
+                    value={verifyPhone}
+                    onChange={(e) => setVerifyPhone(e.target.value)}
+                    placeholder="WhatsApp number"
+                    className="min-w-0 flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-center">
                 <button
                   type="submit"
                   className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs cursor-pointer shrink-0 transition-colors"

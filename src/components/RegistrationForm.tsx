@@ -181,6 +181,9 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
             <p className="text-xs text-slate-600 mt-1 max-w-sm mx-auto">
               {t.successSubtitle}
             </p>
+            <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-3 max-w-md mx-auto">
+              Your registration is pending administrator approval. Your member directory access will activate after approval.
+            </p>
           </div>
 
           {/* Digital ID Card */}
@@ -438,7 +441,7 @@ export const RegistrationForm: React.FC<RegistrationFormProps> = ({
         <div className="p-2 rounded-xl bg-emerald-50/80 border border-emerald-200 text-[10px] text-emerald-900 flex items-center gap-1.5">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
           <span className="font-semibold">
-            Real-time sync to cloud database. Data safely encrypted with 256-bit AES.
+            Registration details are sent securely to the community database. Only encrypted backups use AES-256.
           </span>
         </div>
 
