@@ -1,0 +1,83 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // Community Member validation
+    function isValidMember(data) {
+      return data.keys().hasAll(['id', 'fullName', 'country', 'whatsappNumber', 'arrivalDateInArmenia', 'agentOrAgencyName', 'verificationStatus', 'registeredAt']) &&
+        data.id is string && data.id.size() <= 64 &&
+        data.fullName is string && data.fullName.size() > 0 && data.fullName.size() <= 150 &&
+        data.country is string && data.country.size() <= 100 &&
+        data.whatsappNumber is string && data.whatsappNumber.size() <= 30 &&
+        data.arrivalDateInArmenia is string && data.arrivalDateInArmenia.size() <= 50 &&
+        data.agentOrAgencyName is string && data.agentOrAgencyName.size() <= 200 &&
+        data.verificationStatus in ['approved', 'pending', 'flagged', 'rejected'] &&
+        data.registeredAt is string && data.registeredAt.size() <= 50;
+    }
+
+    // SOS Emergency Alert validation
+    function isValidSosAlert(data) {
+      return data.keys().hasAll(['id', 'memberName', 'phone', 'category', 'timestamp', 'status']) &&
+        data.id is string && data.id.size() <= 64 &&
+        data.memberName is string && data.memberName.size() <= 150 &&
+        data.phone is string && data.phone.size() <= 40 &&
+        data.category is string && data.category.size() <= 50 &&
+        data.status in ['active', 'resolved'] &&
+        data.timestamp is string && data.timestamp.size() <= 50;
+    }
+
+    // Members collection rules
+    match /members/{memberId} {
+      // Community roster can be read by visitors/members
+      allow read: if isValidId(memberId);
+      
+      // Community members can register themselves with validated schema
+      allow create: if isValidId(memberId) &&
+                    isValidMember(incoming()) &&
+                    incoming().id == memberId;
+                    
+      // Status updates, notes, or verification
+      allow update: if isValidId(memberId) &&
+                    isValidMember(incoming()) &&
+                    incoming().id == existing().id;
+                    
+      // Deletion
+      allow delete: if isValidId(memberId);
+    }
+
+    // SOS emergency assistance collection rules
+    match /sos/{alertId} {
+      allow read: if isValidId(alertId);
+      
+      // Any community member in emergency can submit an alert
+      allow create: if isValidId(alertId) &&
+                    isValidSosAlert(incoming()) &&
+                    incoming().id == alertId;
+                    
+      // Resolution of emergency alerts
+      allow update: if isValidId(alertId) &&
+                    isValidSosAlert(incoming()) &&
+                    incoming().id == existing().id;
+                    
+      allow delete: if isValidId(alertId);
+    }
+  }
+}

@@ -1,0 +1,117 @@
+import React, { useState } from 'react';
+import { Lock, ShieldAlert, KeyRound, X, CheckCircle2 } from 'lucide-react';
+import { CrestLogo } from './CrestLogo';
+
+interface AdminPasscodeModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const ADMIN_SECRET = '197519';
+
+export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+}) => {
+  const [passcode, setPasscode] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcode.trim() === ADMIN_SECRET) {
+      setErrorMessage('');
+      setIsSuccess(true);
+      setTimeout(() => {
+        onSuccess();
+        setPasscode('');
+        setIsSuccess(false);
+      }, 500);
+    } else {
+      setErrorMessage('Access Denied: Incorrect administrator password. Please try again.');
+      setPasscode('');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-sm overflow-hidden p-6 sm:p-7 relative text-center space-y-5">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="flex flex-col items-center">
+          <div className="w-14 h-14 rounded-2xl bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center shadow-xs mb-3">
+            <Lock className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">
+            Administrator Access
+          </h2>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            Enter the protected admin passcode to manage database and cloud backups.
+          </p>
+        </div>
+
+        {errorMessage && (
+          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
+            <ShieldAlert className="w-4 h-4 text-rose-600 shrink-0" />
+            <span>{errorMessage}</span>
+          </div>
+        )}
+
+        {isSuccess && (
+          <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+            <span>Passcode verified. Unlocking...</span>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="relative">
+            <KeyRound className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+            <input
+              type="password"
+              inputMode="numeric"
+              maxLength={12}
+              autoFocus
+              value={passcode}
+              onChange={(e) => {
+                setPasscode(e.target.value);
+                setErrorMessage('');
+              }}
+              placeholder="Enter Admin Password..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-slate-300 focus:border-amber-500 text-slate-900 text-center font-mono text-base font-bold tracking-widest focus:outline-none transition-all shadow-inner"
+            />
+          </div>
+
+          <div className="flex gap-2.5">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-3 px-4 rounded-xl border border-slate-300 text-slate-700 text-xs font-bold hover:bg-slate-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs font-extrabold shadow-md transition-all cursor-pointer"
+            >
+              Unlock
+            </button>
+          </div>
+        </form>
+
+        <div className="pt-2 text-[10px] text-slate-400 font-mono">
+          Indo Armenia LLC · Security Gate
+        </div>
+      </div>
+    </div>
+  );
+};

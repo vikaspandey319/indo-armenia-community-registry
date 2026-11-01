@@ -1,0 +1,8 @@
+{
+  "name": "Indo-Armenia LLC - Indian Community Registry & Admin Portal",
+  "description": "Digital registration portal for Indian community members by Indo-Armenia LLC with photo upload, Member ID card generator, real-time admin monitoring, and encrypted cloud backup.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

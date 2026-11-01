@@ -1,0 +1,122 @@
+{
+  "entities": {
+    "Member": {
+      "title": "Member",
+      "description": "Registered Indian Community Member in Armenia",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique official member ID e.g. IA-IND-2026-1084"
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Full legal or passport name of the member"
+        },
+        "photoUrl": {
+          "type": "string",
+          "description": "Profile photo URL or avatar image data"
+        },
+        "country": {
+          "type": "string",
+          "description": "Home country (India)"
+        },
+        "whatsappCountryCode": {
+          "type": "string",
+          "description": "WhatsApp dialing code e.g. +374 or +91"
+        },
+        "whatsappNumber": {
+          "type": "string",
+          "description": "WhatsApp contact phone number"
+        },
+        "arrivalDateInArmenia": {
+          "type": "string",
+          "description": "Arrival date in Armenia (YYYY-MM-DD)"
+        },
+        "agentOrAgencyName": {
+          "type": "string",
+          "description": "Agency / Agent Name in home country"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Admin notes or member description"
+        },
+        "verificationStatus": {
+          "type": "string",
+          "enum": ["approved", "pending", "flagged", "rejected"]
+        },
+        "registeredAt": {
+          "type": "string",
+          "description": "ISO timestamp when registered"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp of last update"
+        },
+        "checksum": {
+          "type": "string",
+          "description": "Integrity checksum verification hash"
+        }
+      },
+      "required": ["id", "fullName", "country", "whatsappNumber", "arrivalDateInArmenia", "agentOrAgencyName", "verificationStatus", "registeredAt"]
+    },
+    "SosAlert": {
+      "title": "SosAlert",
+      "description": "Emergency SOS Assistance Alert",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique SOS alert ID e.g. SOS-abc123"
+        },
+        "memberName": {
+          "type": "string",
+          "description": "Name of person requesting emergency help"
+        },
+        "phone": {
+          "type": "string",
+          "description": "Emergency contact phone number"
+        },
+        "category": {
+          "type": "string",
+          "description": "Emergency category (medical, police, legal, general)"
+        },
+        "message": {
+          "type": "string",
+          "description": "Emergency message or situation description"
+        },
+        "location": {
+          "type": "string",
+          "description": "Location in Armenia"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "ISO timestamp of dispatch"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "resolved"]
+        },
+        "resolvedAt": {
+          "type": "string",
+          "description": "Timestamp when alert was resolved"
+        },
+        "resolvedBy": {
+          "type": "string",
+          "description": "Admin who marked the alert as resolved"
+        }
+      },
+      "required": ["id", "memberName", "phone", "category", "timestamp", "status"]
+    }
+  },
+  "firestore": {
+    "/members/{memberId}": {
+      "schema": "Member",
+      "description": "Collection of community member registry documents for Indo-Armenia LLC"
+    },
+    "/sos/{alertId}": {
+      "schema": "SosAlert",
+      "description": "Collection of emergency assistance alerts"
+    }
+  }
+}

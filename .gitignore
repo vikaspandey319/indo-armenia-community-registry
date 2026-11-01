@@ -1,0 +1,13 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Runtime records may contain member contact details and emergency reports.
+data/members.json
+data/sos.json
+data/sheets-config.json
