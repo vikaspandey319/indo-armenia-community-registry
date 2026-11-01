@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Lock, ShieldAlert, KeyRound, X, CheckCircle2 } from 'lucide-react';
 import { auth } from '../services/firebase';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { sendEmailVerification, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 
 interface AdminPasscodeModalProps {
   isOpen: boolean;
@@ -27,6 +27,14 @@ export const AdminPasscodeModal: React.FC<AdminPasscodeModalProps> = ({
     setIsSubmitting(true);
     try {
       const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      if (!credential.user.emailVerified) {
+        try {
+          await sendEmailVerification(credential.user);
+        } finally {
+          await signOut(auth);
+        }
+        throw new Error('Check your inbox for a Firebase verification email, verify your address, then sign in again.');
+      }
       const idToken = await credential.user.getIdToken();
       const response = await fetch('/api/admin/session', {
         headers: { Authorization: `Bearer ${idToken}` },
