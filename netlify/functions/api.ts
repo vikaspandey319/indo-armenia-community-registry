@@ -26,7 +26,8 @@ function firebase() {
     const serviceAccount = JSON.parse(raw);
     app = initializeApp({ credential: cert(serviceAccount) });
   }
-  return { auth: getAuth(app), db: getFirestore(app) };
+  const databaseId = process.env.FIRESTORE_DATABASE_ID?.trim() || '(default)';
+  return { auth: getAuth(app), db: getFirestore(app, databaseId) };
 }
 
 function cookieValue(request: Request, name: string) {

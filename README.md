@@ -17,6 +17,7 @@ A React and TypeScript registry for Indo-Armenian community members, with member
    - `FIREBASE_SERVICE_ACCOUNT_JSON`: the Firebase service account JSON as one-line JSON. Keep it private; do not commit it.
    - `MEMBER_SESSION_SECRET`: a random secret of at least 32 characters.
    - `ADMIN_EMAIL`: the administrator's email address.
+   - `FIRESTORE_DATABASE_ID`: Firestore database ID. Use `(default)` for the default database, or the exact ID of an existing named database.
 4. In Firebase Authentication, enable email/password sign-in and create/verify the admin account. The email must match `ADMIN_EMAIL`.
 5. Confirm Firestore is enabled in the Firebase project referenced by `firebase-applet-config.json`.
 
